@@ -1,23 +1,25 @@
 package com.github.viewmodel.ui
 
+import android.content.res.Resources
 import android.os.Bundle
 import android.util.Log
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.databinding.DataBindingUtil
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.observe
-import androidx.navigation.findNavController
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import com.github.viewmodel.R
 import com.github.viewmodel.adapter.PhotosAdapter
 import com.github.viewmodel.databinding.FragmentHomeBinding
-import com.github.viewmodel.network.PhotoService
 import com.github.viewmodel.vm.PhotoViewModel
+import com.google.android.material.appbar.AppBarLayout
 import kotlinx.android.synthetic.main.fragment_home.*
+import kotlin.math.absoluteValue
 
 class HomeFragment : Fragment() {
 
@@ -52,34 +54,68 @@ class HomeFragment : Fragment() {
 //                doNetWork()
 //            }
 //        }
-        viewModel.doNetWork()
+        viewModel.loadPhotos()
         val photoAdapter = PhotosAdapter()
+        val sLayoutManager = StaggeredGridLayoutManager(2, RecyclerView.VERTICAL)
         with(binding.photoRecyclerView) {
-            layoutManager = StaggeredGridLayoutManager(2, RecyclerView.VERTICAL)
+            layoutManager = sLayoutManager
             adapter = photoAdapter
+            addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                    super.onScrollStateChanged(recyclerView, newState)
+                    sLayoutManager.invalidateSpanAssignments()
+                }
+            })
         }
         viewModel.photos.observe(viewLifecycleOwner) { list ->
             photoAdapter.submitList(list)
         }
-        to_fragment2.setOnClickListener {
-            val action =
-                HomeFragmentDirections.actionBlankFragmentToBlankFragment2()
-                    .apply { name = "hello nav" }
-            view.findNavController().navigate(action)
-            Log.e("TAG", "onViewCreated: Kotlin")
-        }
+
+        collapsingToolbar.title = "Hello Material"
+//        toolBar.setNavigationIcon(R.drawable.ic_action_name)
+//        toolBar.setNavigationOnClickListener {
+//            Toast.makeText(context, "back???", Toast.LENGTH_SHORT).show()
+//        }
+//        to_fragment2.setOnClickListener {
+//            val action =
+//                HomeFragmentDirections.actionBlankFragmentToBlankFragment2()
+//                    .apply { name = "hello nav" }
+//            view.findNavController().navigate(action)
+//            Log.e("TAG", "onViewCreated: Kotlin")
+//        }
+        appBarLayout.addOnOffsetChangedListener(AppBarLayout.OnOffsetChangedListener { appBarLayout, verticalOffset ->
+            Log.e(
+                "Offset",
+                "offset = $verticalOffset , top = ${expand_title.top} , calc = ${60f.dp2px()} , total = ${appBarLayout.totalScrollRange}"
+            )
+            val offsetAbs = verticalOffset.absoluteValue
+            val scrollRange = appBarLayout.totalScrollRange
+            when {
+                offsetAbs == scrollRange -> {
+                    collapse_title.visibility = View.VISIBLE
+                    collapse_title.alpha = 1f
+                }
+                offsetAbs >= scrollRange / 4 * 3 -> {
+                    collapse_title.alpha =
+                        0.8f * (offsetAbs - scrollRange / 2) / (scrollRange / 2)
+                    collapse_title.visibility = View.VISIBLE
+                }
+                else -> {
+                    collapse_title.visibility = View.GONE
+                }
+            }
+            expand_title.translationY = verticalOffset.toFloat() / 2
+            val alpha = 1f - offsetAbs.toFloat() / scrollRange.toFloat()
+            Log.e("Offset", "alpha = $alpha")
+            expand_title.alpha = alpha
+        })
+
 
     }
 
-    private suspend fun doNetWork() {
-        val apiService = PhotoService()
-        try {
-            val s = apiService.getPhotos(q = "car", page = 1)
-            Log.e(TAG, "doNetWork: " + s.hits)
-        } catch (e: Exception) {
-            Log.e(TAG, "doNetWork: " + e.message)
-        }
+    fun Float.dp2px(): Int {
+        val scale: Float = Resources.getSystem().displayMetrics.density
+        return (this * scale + 0.5f).toInt()
     }
-
 
 }
